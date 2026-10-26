@@ -109,8 +109,9 @@ def has_entry_shape(runner, source):
 
 def load_allowlist(text):
     allowlist = load_canonical(text, ALLOWLIST)
-    require(isinstance(allowlist, dict) and all(name and isinstance(repository, str) and REPOSITORY.fullmatch(repository)
-                                                for name, repository in allowlist.items()),
+    require(isinstance(allowlist, dict)
+            and all(name and isinstance(repository, str) and REPOSITORY.fullmatch(repository)
+                    for name, repository in allowlist.items()),
             ALLOWLIST + " must map each plugin name to an owner/repo")
     return allowlist
 
