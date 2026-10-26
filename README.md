@@ -80,6 +80,10 @@ A refused run exits 1 with the error on stderr. It is refused for:
 - a rewrite: the same version, with a different SHA, path or set of runners;
 - validation: `claude plugin validate --strict` failing on the candidate.
 
+A run that is not started from the root of an ai-plugins checkout, cannot fetch `main`, or has its push rejected on all
+three attempts also exits 1 and publishes nothing; more than three simultaneous publishes can exhaust those attempts,
+which shows as a failed run to rerun.
+
 `verify.yml` runs `scripts/test-publish.py` and `scripts/publish.py check` on every push and pull request, except a
 publish commit: a push made with the workflow's `GITHUB_TOKEN` starts no workflow. `update` checks its own candidate
 instead: the scope of the change, then `claude plugin validate --strict`.
