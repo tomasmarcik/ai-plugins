@@ -1,6 +1,6 @@
 {
   "interface": {
-    "displayName": "Kobo"
+    "displayName": "AI Plugins"
   },
   "name": "ai-plugins",
   "plugins": [
