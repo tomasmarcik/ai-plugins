@@ -1,0 +1,19 @@
+{
+  "description": "Claude and Codex plugin marketplace.",
+  "name": "ai-plugins",
+  "owner": {
+    "name": "Tomas Marcik"
+  },
+  "plugins": [
+    {
+      "name": "kobo",
+      "source": {
+        "path": "plugin/kobo",
+        "ref": "v0.4.3",
+        "sha": "a9127b17172cb1bfa1ce5c23a836adc43ad82d6a",
+        "source": "git-subdir",
+        "url": "https://github.com/tomasmarcik/kobo.git"
+      }
+    }
+  ]
+}

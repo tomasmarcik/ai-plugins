@@ -1,0 +1,22 @@
+{
+  "interface": {
+    "displayName": "Kobo"
+  },
+  "name": "ai-plugins",
+  "plugins": [
+    {
+      "category": "Productivity",
+      "name": "kobo",
+      "policy": {
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
+      },
+      "source": {
+        "path": "./plugins/kobo",
+        "ref": "codex-v0.4.3",
+        "source": "git-subdir",
+        "url": "https://github.com/tomasmarcik/kobo.git"
+      }
+    }
+  ]
+}
