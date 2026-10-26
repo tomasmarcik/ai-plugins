@@ -32,11 +32,6 @@ on:
 permissions:
   contents: write
 
-# Publishes run one at a time; each rebuilds on the current main.
-concurrency:
-  group: publish
-  cancel-in-progress: false
-
 # An explicit bash adds -o pipefail: without it, a failure early in a pipe passes the step.
 defaults:
   run:
@@ -46,10 +41,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
+      # Before checkout, which writes the job's push credential to disk for git.
       - name: Install the claude CLI, which validates the Claude catalog before it is committed
         run: npm install -g @anthropic-ai/claude-code@2.1.310
+
+      - uses: actions/checkout@v7
 
       # Inputs reach the script through env, never inside the command line.
       - env:
