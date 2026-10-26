@@ -60,6 +60,12 @@ def parse(text, path):
         raise PublishError(path + " is not valid JSON") from None
 
 
+def load_canonical(text, path):
+    value = parse(text, path)
+    require(text == canonical(value), path + " is not canonical JSON")
+    return value
+
+
 def semver(text):
     match = SEMVER.fullmatch(text) if isinstance(text, str) else None
     return tuple(map(int, match.groups())) if match else None
@@ -102,7 +108,7 @@ def has_entry_shape(runner, source):
 
 
 def load_allowlist(text):
-    allowlist = parse(text, ALLOWLIST)
+    allowlist = load_canonical(text, ALLOWLIST)
     require(isinstance(allowlist, dict) and all(name and isinstance(repository, str) and REPOSITORY.fullmatch(repository)
                                                 for name, repository in allowlist.items()),
             ALLOWLIST + " must map each plugin name to an owner/repo")
@@ -156,14 +162,10 @@ class Repository:
         return [name for name in listing.stdout.decode().split("\0") if name]
 
     def check(self):
-        text = self.read(ALLOWLIST)
-        require(text == canonical(parse(text, ALLOWLIST)), ALLOWLIST + " is not canonical JSON")
-        allowlist = load_allowlist(text)
+        allowlist = load_allowlist(self.read(ALLOWLIST))
         versions = {}
         for runner, path in CATALOGS.items():
-            text = self.read(path)
-            catalog = parse(text, path)
-            require(text == canonical(catalog), path + " is not canonical JSON")
+            catalog = load_canonical(self.read(path), path)
             require(isinstance(catalog, dict) and catalog.get("name") == NAME, path + " must be named " + NAME)
             names = [entry["name"] for entry in entries(catalog, path)]
             duplicates = sorted({name for name in names if names.count(name) > 1})
@@ -237,7 +239,7 @@ class Repository:
             require(plugin in allowlist, "plugin " + plugin + " is not in " + ALLOWLIST)
             require(inputs["source"] == allowlist[plugin],
                     "source " + inputs["source"] + " is not the allowlisted source of " + plugin)
-            catalogs = {runner: parse(self.blob(base, path), path) for runner, path in CATALOGS.items()}
+            catalogs = {runner: load_canonical(self.blob(base, path), path) for runner, path in CATALOGS.items()}
             status, candidate = classify(catalogs, inputs)
             if candidate is None:
                 return result(status, inputs)

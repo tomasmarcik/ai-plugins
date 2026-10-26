@@ -835,6 +835,21 @@ def a6n(c):
                       "plugin:kobo", "plugin/kobo?", "plug\u00efn", "-plugin", "plugin/-kobo", "./-kobo"))
 
 
+@case("A6o", "a non-canonical allowlist or catalog on main: refused, never reformatted")
+def a6o(c):
+    c.build()
+    for files, rel in (({ALLOW: '{"kobo": "tomasmarcik/kobo"}\n'}, ALLOW),
+                       ({ALLOW: SEED_ALLOWLIST, CL: json.dumps(json.loads(SEED_CLAUDE), indent=4, sort_keys=True)
+                         + "\n"}, CL),
+                       ({CL: SEED_CLAUDE.rstrip("\n")}, CL),
+                       ({CL: SEED_CLAUDE, CX: unsorted(SEED_CODEX)}, CX)):
+        c.push_fixture(files, "chore: hand-format %s" % rel)
+        try:
+            refused_early(c, c.update(kobo()), "%s is not canonical JSON" % rel)
+        except Failure as error:
+            raise Failure("%r: %s" % (sorted(files), error))
+
+
 # A7: concurrent pushes
 
 README_EDIT = SEED_README + "\nA concurrent hand edit.\n"
