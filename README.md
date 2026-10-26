@@ -54,7 +54,8 @@ the source.
 - **The allowlist decides who publishes.** `allowlist.json` maps each plugin name to its one source repository. It
   changes only by hand, in a reviewed commit or pull request. The workflow reads it and never writes it.
 - **The dispatch is data only:** `plugin`, `source`, `version`, `sha`, `claude-path` and `codex-path`. A path is empty
-  when the plugin ships nothing for that runner.
+  when the plugin ships nothing for that runner. Otherwise it is relative, and each of its segments is made of
+  `[A-Za-z0-9._-]`, is not `.` or `..`, and does not start with `-`.
 - **Only `source` is written.** `scripts/publish.py update` rewrites that plugin's `source` objects and nothing else,
   then pushes one commit, `chore: publish <plugin> <version>`, to `main`. Other entry fields, such as the Claude
   `category` and the Codex `policy` and `category`, are edited by hand and kept.

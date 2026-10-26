@@ -21,6 +21,7 @@ import tempfile
 SEMVER = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 REPOSITORY = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/(?!\.\.?\Z)[A-Za-z0-9_.-]+\Z")
+SEGMENT = re.compile(r"[A-Za-z0-9._][A-Za-z0-9._-]*\Z")
 NAME = "ai-plugins"
 ALLOWLIST = "allowlist.json"
 CATALOGS = {"claude": ".claude-plugin/marketplace.json", "codex": ".agents/plugins/marketplace.json"}
@@ -74,7 +75,7 @@ def relative_path(text):
     """The normalized relative form of text, without a leading ./, or None."""
     if text.startswith("./"):
         text = text[2:]
-    if not text or "\\" in text or any(part in ("", ".", "..") for part in text.split("/")):
+    if not all(SEGMENT.fullmatch(part) and part not in (".", "..") for part in text.split("/")):
         return None
     return text
 
@@ -273,7 +274,8 @@ def read_inputs():
         value = os.environ.get(key, "")
         if value:
             paths[runner] = relative_path(value)
-            require(paths[runner] is not None, key + " must be a normalized relative path without .. or backslashes")
+            require(paths[runner] is not None, key + " must be a normalized relative path of [A-Za-z0-9._-] segments,"
+                    " none empty, . or .., none starting with -")
     require(paths, "at least one of CLAUDE_PATH and CODEX_PATH must be set")
     inputs["paths"] = paths
     return inputs

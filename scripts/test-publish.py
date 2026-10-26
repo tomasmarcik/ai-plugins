@@ -763,7 +763,8 @@ def a6e(c):
              "SHA must be 40 lowercase hex characters")
 
 
-PATH_RULE = "%s must be a normalized relative path without .. or backslashes"
+PATH_RULE = ("%s must be a normalized relative path of [A-Za-z0-9._-] segments, none empty, . or .., "
+             "none starting with -")
 
 
 def path_refusals(c, values):
@@ -825,6 +826,13 @@ def a6m(c):
     c.build({CX: with_source(SEED_CODEX, "kobo", codex_source("tomasmarcik/kobo", "plugins/kobo", "0.4.2"))})
     refusals(c, [{"VERSION": v} for v in ("0.4.1", "0.4.2", "0.4.3", "0.4.4")],
              "kobo's current entries disagree on the version")
+
+
+@case("A6n", "a path with a character outside [A-Za-z0-9._-], or a segment starting with -")
+def a6n(c):
+    c.build()
+    path_refusals(c, ("plugin/ko bo", " plugin", "plugin\t", "plugin\nkobo", "plugin/kobo\n", "plugin/*",
+                      "plugin:kobo", "plugin/kobo?", "plug\u00efn", "-plugin", "plugin/-kobo", "./-kobo"))
 
 
 # A7: concurrent pushes
@@ -1135,6 +1143,17 @@ def a10q(c):
     equal(payload["error"], "claude plugin validate --strict failed", "error")
     for marker in ("FAKE-STDOUT-MARKER", "FAKE-STDERR-MARKER"):
         expect(marker in payload["detail"], "detail lacks %s: %r" % (marker, payload["detail"]))
+
+
+@case("A10r", "check: a source path with a character outside [A-Za-z0-9._-], or a segment starting with -")
+def a10r(c):
+    shape = "%s entry kobo does not have the %s source shape: git-subdir, url, normalized path, ref %s<semver>, %s"
+    shapes = {CL: shape % (CL, "claude", "v", "40-hex sha"), CX: shape % (CX, "codex", "codex-v", "no sha")}
+    check_fails(c, [("%s %r" % (CL, path), {CL: kobo_cl_source(path=path)}, None) for path in (
+        "plugin/ko bo", "plugin/kobo\n", "plugin/*", "plugin:kobo", "-plugin", "plugin/-kobo")] + [
+        ("%s %r" % (CX, path), {CX: kobo_cx_source(path=path)}, None) for path in (
+            "./plugins/ko bo", "./plugins/*", "./-kobo")],
+        lambda label: shapes[label.split(" ")[0]])
 
 
 def main():
