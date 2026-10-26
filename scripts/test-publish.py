@@ -363,7 +363,7 @@ class Case(object):
                                   GIT_ALLOW_PROTOCOL="file")}
         (self.suite.bin / "fake-claude.json").write_text(json.dumps(config))
 
-    def update(self, data, mode="pass", rounds=None, actions=True, ref="refs/heads/main", extra=None):
+    def update(self, data, mode="pass", rounds=None, actions=True, ref="refs/heads/main", extra=None, cwd=None):
         self.configure_fake(mode, rounds)
         env = {"GITHUB_ACTIONS": "true", "GITHUB_REF": ref} if actions else {}
         env.update(data)
@@ -373,7 +373,7 @@ class Case(object):
         run.work_status = self.git(self.work, "status", "--porcelain")
         run.work_head = self.git(self.work, "rev-parse", "HEAD")
         marks = [len(self.lines(path)) for path in (self.claude_log, self.push_log, self.race_log)]
-        proc = subprocess.run([sys.executable, str(SCRIPT), "update"], cwd=str(self.work), env=self.env(env),
+        proc = subprocess.run([sys.executable, str(SCRIPT), "update"], cwd=str(cwd or self.work), env=self.env(env),
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         run.rc, run.out, run.err = proc.returncode, proc.stdout, proc.stderr
         run.after = self.refs()
@@ -848,6 +848,102 @@ def a6o(c):
             refused_early(c, c.update(kobo()), "%s is not canonical JSON" % rel)
         except Failure as error:
             raise Failure("%r: %s" % (sorted(files), error))
+
+
+def state_refusals(c, variants, message):
+    """Each variant (catalog, text) pushed to origin main as a hand edit, the other catalog as seeded; a dispatch
+    that would otherwise publish is refused with message(catalog)."""
+    seeds = {CL: SEED_CLAUDE, CX: SEED_CODEX}
+    for index, (rel, text) in enumerate(variants):
+        files = dict(seeds, **{rel: text})
+        c.push_fixture(files, "chore: hand edit %d" % index)
+        try:
+            refused_early(c, c.update(kobo()), message(rel))
+        except Failure as error:
+            raise Failure("%s variant %d: %s" % (rel, index, error))
+
+
+@case("A6p", "a current entry without a <prefix><semver> ref")
+def a6p(c):
+    c.build()
+    state_refusals(c, [
+        (CL, kobo_cl_source(ref="0.4.3")), (CL, kobo_cl_source(ref="v0.04.3")),
+        (CL, kobo_cl_source(ref="codex-v0.4.3")), (CL, claude_edit(lambda d: d["plugins"][0]["source"].pop("ref"))),
+        (CL, claude_edit(lambda d: d["plugins"][0].pop("source"))), (CX, kobo_cx_source(ref="v0.4.3")),
+        (CX, kobo_cx_source(ref="codex-v0.4")), (CX, kobo_cx_source(ref=1))],
+        lambda rel: "%s entry kobo has no %s<semver> ref" % (rel, "v" if rel == CL else "codex-v"))
+
+
+@case("A6q", "a catalog on main with two entries named for the plugin")
+def a6q(c):
+    c.build()
+    state_refusals(c, [(CL, claude_edit(lambda d: d["plugins"].append(dict(d["plugins"][0])))),
+                       (CX, codex_edit(lambda d: d["plugins"].insert(0, {"name": "kobo"})))],
+                   lambda rel: "%s has more than one entry named kobo" % rel)
+
+
+@case("A6r", "a catalog on main without a plugins list of named entries")
+def a6r(c):
+    c.build()
+    state_refusals(c, [
+        (CL, claude_edit(lambda d: d.pop("plugins"))), (CL, claude_edit(lambda d: d.update(plugins={"kobo": {}}))),
+        (CL, claude_edit(lambda d: d["plugins"].append("zeta"))),
+        (CL, claude_edit(lambda d: d["plugins"].append({"source": {}}))),
+        (CL, claude_edit(lambda d: d["plugins"].append({"name": 7}))), (CL, canonical([json.loads(SEED_CLAUDE)])),
+        (CX, codex_edit(lambda d: d.update(plugins=None))), (CX, codex_edit(lambda d: d["plugins"].append([])))],
+        lambda rel: "%s must hold a plugins list of named entries" % rel)
+
+
+@case("A6s", "claude not on PATH: refused at validation, no commit, no attempt scratch left")
+def a6s(c):
+    c.build()
+    trimmed = c.dir / "trimmed-bin"
+    trimmed.mkdir()
+    os.symlink(shutil.which("git", path=c.suite.path), str(trimmed / "git"))
+    expect(shutil.which("claude", path=str(trimmed)) is None, "fixture error: a claude on the trimmed PATH")
+    run = c.update(kobo(), extra={"PATH": str(trimmed)})
+    refused(c, run, "claude not found on PATH")
+    equal(len(run.validates), 0, "validate calls")
+    equal(os.listdir(str(c.work / "tmp" / "publish")), [], "attempt scratch left in tmp/publish")
+
+
+ROOT_RULE = "run from the root of an ai-plugins checkout"
+
+
+@case("A6t", "update and check not run from the root of the checkout: refused")
+def a6t(c):
+    c.build()
+    for cwd in (c.work / ".claude-plugin", c.work / ".agents" / "plugins", c.dir):
+        try:
+            refused_early(c, c.update(kobo(), cwd=cwd), ROOT_RULE)
+        except Failure as error:
+            raise Failure("update from %s: %s" % (cwd.relative_to(c.dir.parent), error))
+    tree = c.tree("subdir")
+    for cwd in (tree / "scripts", tree / ".github" / "workflows"):
+        run = c.check(cwd)
+        try:
+            equal(run.rc, 1, "exit code (stdout %r)" % run.out)
+            equal(run.out, "", "stdout")
+            equal(one_json(run.err, "stderr"), {"error": ROOT_RULE}, "error")
+            equal(len(run.validates), 0, "validate calls")
+        except Failure as error:
+            raise Failure("check from %s: %s" % (cwd.relative_to(c.dir.parent), error))
+
+
+@case("A6u", "a credential in origin's URL reaches neither stdout nor stderr")
+def a6u(c):
+    c.build()
+    # The https URL is blocked offline by GIT_ALLOW_PROTOCOL=file, and git's refusal omits it. git prints the
+    # missing local path in full, so that variant fails if git's own output is passed through.
+    for url in ("https://user:SECRET@127.0.0.1:1/x.git", str(c.dir / "user:SECRET@missing.git")):
+        c.git(c.work, "remote", "set-url", "origin", url)
+        run = c.update(kobo())
+        try:
+            for stream, text in (("stdout", run.out), ("stderr", run.err)):
+                expect("SECRET" not in text, "%s carries the credential: %r" % (stream, text))
+            refused_early(c, run, "could not fetch main from origin")
+        except Failure as error:
+            raise Failure("%s: %s" % (url, error))
 
 
 # A7: concurrent pushes
