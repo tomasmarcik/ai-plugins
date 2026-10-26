@@ -1,0 +1,27 @@
+name: Verify
+
+# pull_request covers allowlist PRs from forks, whose pushes run in the fork.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the claude CLI, which publish.py check uses to validate the Claude catalog
+        run: npm install -g @anthropic-ai/claude-code@2.1.310
+
+      - run: python3 scripts/test-publish.py
+      - run: python3 scripts/publish.py check

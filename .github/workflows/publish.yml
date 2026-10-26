@@ -1,0 +1,62 @@
+name: Publish
+
+# A source repository's release job dispatches this with its release data. ai-plugins never reads the source.
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin name, as allowlist.json lists it
+        required: true
+        type: string
+      source:
+        description: Source repository, owner/repo
+        required: true
+        type: string
+      version:
+        description: Released version, MAJOR.MINOR.PATCH
+        required: true
+        type: string
+      sha:
+        description: Commit the source tag v<version> points at
+        required: true
+        type: string
+      claude-path:
+        description: Claude plugin directory in the source at v<version>; empty when it ships none
+        required: false
+        type: string
+      codex-path:
+        description: Codex plugin directory in the source at codex-v<version>; empty when it ships none
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+# Publishes run one at a time; each rebuilds on the current main.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+# An explicit bash adds -o pipefail: without it, a failure early in a pipe passes the step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the claude CLI, which validates the Claude catalog before it is committed
+        run: npm install -g @anthropic-ai/claude-code@2.1.310
+
+      # Inputs reach the script through env, never inside the command line.
+      - env:
+          PLUGIN: ${{ inputs.plugin }}
+          SOURCE: ${{ inputs.source }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ inputs.sha }}
+          CLAUDE_PATH: ${{ inputs.claude-path }}
+          CODEX_PATH: ${{ inputs.codex-path }}
+        run: python3 scripts/publish.py update
