@@ -13,7 +13,7 @@
       },
       "source": {
         "path": "./plugins/kobo",
-        "ref": "codex-v0.4.3",
+        "ref": "codex-v0.4.4",
         "source": "git-subdir",
         "url": "https://github.com/tomasmarcik/kobo.git"
       }
