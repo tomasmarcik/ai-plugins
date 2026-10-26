@@ -6,6 +6,7 @@
   },
   "plugins": [
     {
+      "category": "development",
       "name": "kobo",
       "source": {
         "path": "plugin/kobo",
