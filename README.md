@@ -7,8 +7,8 @@ at a plugin's own source repository by an immutable release tag.
 
 Replace `<plugin>` with a plugin name from the catalogs, for example `kobo`.
 
-- Each plugin is fetched from its own source repository, which every installer must be able to read: public, or
-  private and shared with them.
+- Each plugin is fetched from its own source repository. Claude Code and Codex fetch it with your Git credentials,
+  which must be able to read it; how the Claude app fetches a private source is not yet confirmed.
 - Use one install path: an install from the Claude app also appears in Claude Code.
 
 ### Claude app
@@ -61,15 +61,28 @@ the source.
   `category` and the Codex `policy` and `category`, are edited by hand and kept.
 - **A first publication** appends `name` and `source` entries. Add their `category`, and any Codex `policy`, by hand.
 
-| Result      | When                                                  | Commit |
-|-------------|-------------------------------------------------------|--------|
-| `added`     | the plugin has no entries yet                         | yes    |
-| `published` | the version is above the published one                | yes    |
-| `unchanged` | the same version, with the same data                  | no     |
-| `older`     | the version is below the published one                | no     |
-| refused     | the same version, with a different SHA or path        | no     |
+| Result      | When                                   | Commit |
+|-------------|----------------------------------------|--------|
+| `added`     | the plugin has no entries yet          | yes    |
+| `published` | the version is above the published one | yes    |
+| `unchanged` | the same version, with the same data   | no     |
+| `older`     | the version is below the published one | no     |
+| refused     | any of the cases below                 | no     |
 
-`verify.yml` runs `scripts/test-publish.py` and `scripts/publish.py check` on every push and pull request.
+A refused run exits 1 with the error on stderr. It is refused for:
+
+- input: a version that is not strict semver, a SHA that is not 40 lowercase hex, a bad path, or no path at all;
+- the allowlist: a plugin not in `allowlist.json`, or a `source` other than its allowlisted one;
+- a missing runner: the plugin has an entry for a runner whose path the dispatch leaves empty;
+- a ref other than `main`: only `main` publishes;
+- the state on `main`: a malformed or non-canonical allowlist or catalog, or entries for the plugin that lack a
+  version or disagree on it;
+- a rewrite: the same version, with a different SHA, path or set of runners;
+- validation: `claude plugin validate --strict` failing on the candidate.
+
+`verify.yml` runs `scripts/test-publish.py` and `scripts/publish.py check` on every push and pull request, except a
+publish commit: a push made with the workflow's `GITHUB_TOKEN` starts no workflow. `update` checks its own candidate
+instead: the scope of the change, then `claude plugin validate --strict`.
 
 To publish by hand with your own GitHub login, leaving out a path the plugin does not ship:
 
@@ -87,7 +100,8 @@ Before it dispatches, a source repository publishing into ai-plugins guarantees:
 3. Codex: an immutable tag `codex-v<version>` on GitHub, whose tree holds the native plugin at `<codex-path>`. Its
    `.codex-plugin/plugin.json` has the same name and version.
 4. The release passed the source's own verification. ai-plugins checks none of this, because it never reads the source.
-5. Every installer can read the source repository: public, or private and shared with each installer.
+5. Claude Code and Codex installers can read the source repository with their Git credentials: public, or private and
+   shared with each of them. How the Claude app fetches a private source is not yet confirmed.
 6. Versions only rise, and each package manifest pins `version`. A dispatch at or below the published version changes
    nothing.
 7. The source dispatches once, at the end of its release job, with the dispatch token: a fine-grained token with
