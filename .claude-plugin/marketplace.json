@@ -10,8 +10,8 @@
       "name": "kobo",
       "source": {
         "path": "plugin/kobo",
-        "ref": "v0.4.4",
-        "sha": "4d6ba31fc4b2966e1ab447754ae4263eeca9924d",
+        "ref": "v0.5.0",
+        "sha": "8f48422a0c71f8638243aff4b4347b817df15237",
         "source": "git-subdir",
         "url": "https://github.com/tomasmarcik/kobo.git"
       }
